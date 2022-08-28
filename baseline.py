@@ -10,11 +10,11 @@ from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.neural_network import MLPClassifier, MLPRegressor
 
 """ Training Dataset as:
-https://archive.ics.uci.edu/ml/datasets/Iris/
-https://archive.ics.uci.edu/ml/datasets/Connectionist+Bench+%28Sonar%2C+Mines+vs.+Rocks%29
+https://archive.ics.uci.edu/ml/machine-learning-databases/iris/
+https://archive.ics.uci.edu/ml/machine-learning-databases/undocumented/connectionist-bench/sonar/
 https://archive.ics.uci.edu/ml/machine-learning-databases/glass/
-https://archive.ics.uci.edu/ml/datasets/Airfoil+Self-Noise
-https://archive.ics.uci.edu/ml/datasets/Wine+Quality
+https://archive.ics.uci.edu/ml/machine-learning-databases/00291/
+https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/
 """
 
 if __name__ == "__main__":
