@@ -95,7 +95,7 @@ def report_regressor(plf, X, y, cv=True):
             z = plf.predict(X_test)
             r2.append(r2_score(y_test, z))
             ma.append(mean_squared_error(y_test, z))
-            n.appned(len(X_test) / len(X))
+            n.append(len(X_test) / len(X))
         print("CV Score:")
         print(" R2 Score = %f"%(np.average(r2, weights=n)))
         print(" Mean Squared Error = %f"%(np.average(ma, weights=n)))
