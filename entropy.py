@@ -6,7 +6,7 @@ def deviation_org(y):
     s = d ** 2
     return np.sqrt(s.mean())
 
-def diviation(y):
+def deviation(y):
     return y.std()
 
 def gini_org(y):
