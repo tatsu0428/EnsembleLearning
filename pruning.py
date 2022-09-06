@@ -44,3 +44,37 @@ def reducederror(node, X, y):
                 return node.right
     # 現在のノードを返す
     return node
+
+def getscore(node, score):
+    # ノードが葉でなかったら
+    if isinstance(node, PrunedTree):
+        if node.score >= 0 and node.score is not np.inf:
+            score.append(node.score)
+        getscore(node.left, score)
+        getscore(node.right, score)
+
+def criticalscore(node, X, y, score_max):
+    # ノードが葉でなかったら
+    if isinstance(node, PrunedTree):
+        # 左右の枝を更新する
+        node.left = criticalscore(node.left, score_max)
+        node.right = criticalscore(node.right, score_max)
+        # ノードを削除
+        if node.score > score_max:
+            leftisleaf = not isinstance(node.left, PrunedTree)
+            rightisleaf = not isinstance(node.right, PrunedTree)
+            # 両方とも葉ならば一つの葉にする
+            if leftisleaf and rightisleaf:
+                return node.left
+            # どちらかが枝ならば枝の方を残す
+            elif leftisleaf and not rightisleaf:
+                return node.right
+            elif not leftisleaf and rightisleaf:
+                return node.left
+            # どちらも枝ならばスコアの良い方を残す
+            elif node.left.scre < node.right.score:
+                return node.left
+            else:
+                return node.right
+        # 現在のノードを返す
+        return node
