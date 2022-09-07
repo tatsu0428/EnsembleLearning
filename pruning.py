@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import support
 import entropy
 from zeror import ZeroRule
@@ -11,7 +12,7 @@ def reducederror(node, X, y):
         # 左右の分割を得る
         feat = X[:,node.feat_index]
         val = node.feat_val
-        l, r = node.max_split(feat, val)
+        l, r = node.make_split(feat, val)
         # 左右にデータが振り分けられるか
         if val is np.inf or len(r) == 0:
             return reducederror(node.left, X, y)  # 1つの枝のみの場合，その枝で置き換える
@@ -78,3 +79,125 @@ def criticalscore(node, X, y, score_max):
                 return node.right
         # 現在のノードを返す
         return node
+
+class PrunedTree(DecisionTree):
+    def __init__(
+        self,
+        prunfnc="critical",
+        pruntest=False,
+        splitratio=0.5,
+        critical=0.8,
+        max_depth=5,
+        metric=entropy.gini,
+        leaf=ZeroRule,
+        depth=1
+    ):
+        super().__init__(max_depth=max_depth, metric=metric, leaf=leaf, depth=depth)
+        self.prunfnc = prunfnc       # プルーニング用関数
+        self.pruntest = pruntest     # プルーニング用にテスト用データを取り分けるか
+        self.splitratio = splitratio # プルーニング用テストデータの割合
+        self.critical = critical     # "critical"プルーニングの閾値
+
+    def get_node(self):
+        # 新しくノードを作成する
+        return PrunedTree(
+            prunfnc=self.prunfnc,
+            max_depth=self.max_depth,
+            metric=self.metric,
+            leaf=self.leaf,
+            depth=self.depth+1
+        )
+
+    def fit(self, X, y):
+        # 深さ=1，根のノードの時のみ
+        if self.depth == 1 and self.prunfnc is not None:
+            # プルーニングに使うデータ
+            X_t, y_t = X, y
+            # プルーニング用にテスト用データを取り分けるならば
+            if self.pruntest:
+                # 学習データとテスト用データを別にする
+                n_test = int(round(len(X) * self.splitratio))
+                n_idx = np.random.permutation(len(X))
+                tmpX = X[n_idx[n_test:]]
+                tmpy = y[n_idx[n_test:]]
+                X_t = X[n_idx[:n_test]]
+                y_t = y[n_idx[:n_test]]
+                X = tmpX
+                y = tmpy
+
+        # 決定木の学習・・・"critical"プルーニング時は木の分割のみ
+        self.left = self.leaf()
+        self.right = self.leaf()
+        left, right = self.split_tree(X, y)
+        if self.depth < self.max_depth:
+            if len(left) > 0:
+                self.left = self.get_node()
+            if len(right) > 0:
+                self.right = self.get_node()
+        if self.depth < self.max_depth or self.prunfnc != "critical":
+            if len(left) > 0:
+                self.left.fit(X[left], y[left])
+            if len(right) > 0:
+                self.right.fit(X[right], y[right])
+
+        # 深さ=1，根のノードの時のみ
+        if self.depth == 1 and self.prunfnc is not None:
+            if self.prunfnc == "reduce":
+                # プルーニングを行う
+                reducederror(self, X_t, y_t)
+            elif self.prunfnc == "critical":
+                # 学習時のMetrics関数のスコアを取得する
+                score = []
+                getscore(self, score)
+                if len(score) > 0:
+                    # スコアから残す枝の最大スコアを計算
+                    i = int(round(len(score) * self.critical))
+                    score_max = sorted(score)[min(i, len(score) - 1)]
+                    # プルーニングを行う
+                    criticalscore(self, score_max)
+                # 葉を学習させる
+                self.fit_leaf(X, y)
+
+        return self
+
+    def fit_leaf(self, X, y):
+        # 説明変数から分割した左右のインデックスを取得
+        feat = X[:,self.feat_index]
+        val = self.feat_val
+        l, r = self.make_split(feat, val)
+        # 葉のみを学習させる
+        if len(l) > 0:
+            if isinstance(self.left, PrunedTree):
+                self.left.fit_leaf(X[l], y[l])
+            else:
+                self.right.fit(X[r], y[r])
+
+
+if __name__ == '__main__':
+	np.random.seed( 1 )
+	ps = support.get_base_args()
+	ps.add_argument('--depth', '-d', type=int, default=5, help='Max Tree Depth')
+	ps.add_argument('--test', '-t', action='store_true', help='Test split for pruning')
+	ps.add_argument('--pruning', '-p', default='critical', help='Pruning Algorithm')
+	ps.add_argument('--ratio', '-a', type=float, default=0.5, help='Test size for pruning')
+	ps.add_argument('--critical', '-l', type=float, default=0.8, help='Value for Critical Pruning')
+	args = ps.parse_args()
+
+	df = pd.read_csv(args.input, sep=args.separator, header=args.header, index_col=args.indexcol)
+	X = df[df.columns[ :-1 ]].values
+
+	if not args.regression:
+		y, clz = support.clz_to_prob(df[ df.columns[ -1 ]])
+		mt = entropy.gini
+		lf = ZeroRule
+		plf = PrunedTree(prunfnc=args.pruning, pruntest=args.test, splitratio=args.ratio,
+					critical=args.critical, metric=mt, leaf=lf, max_depth=args.depth)
+		support.report_classifier(plf, X, y, clz, args.crossvalidate)
+	else:
+		y = df[df.columns[ -1 ]].values.reshape(( -1, 1 ))
+		mt = entropy.deviation
+		lf = Linear
+		plf = PrunedTree(prunfnc=args.pruning, pruntest=args.test, splitratio=args.ratio,
+					critical=args.critical, metric=mt, leaf=lf, max_depth=args.depth)
+		plf.fit(X, y)
+		support.report_regressor(plf, X, y, args.crossvalidate)
