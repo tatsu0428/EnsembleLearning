@@ -54,7 +54,7 @@ def getscore(node, score):
         getscore(node.left, score)
         getscore(node.right, score)
 
-def criticalscore(node, X, y, score_max):
+def criticalscore(node, score_max):
     # ノードが葉でなかったら
     if isinstance(node, PrunedTree):
         # 左右の枝を更新する
@@ -73,25 +73,15 @@ def criticalscore(node, X, y, score_max):
             elif not leftisleaf and rightisleaf:
                 return node.left
             # どちらも枝ならばスコアの良い方を残す
-            elif node.left.scre < node.right.score:
+            elif node.left.score < node.right.score:
                 return node.left
             else:
                 return node.right
-        # 現在のノードを返す
-        return node
+    # 現在のノードを返す
+    return node
 
 class PrunedTree(DecisionTree):
-    def __init__(
-        self,
-        prunfnc="critical",
-        pruntest=False,
-        splitratio=0.5,
-        critical=0.8,
-        max_depth=5,
-        metric=entropy.gini,
-        leaf=ZeroRule,
-        depth=1
-    ):
+    def __init__(self, prunfnc="critical", pruntest=False, splitratio=0.5, critical=0.8, max_depth=5, metric=entropy.gini, leaf=ZeroRule, depth=1):
         super().__init__(max_depth=max_depth, metric=metric, leaf=leaf, depth=depth)
         self.prunfnc = prunfnc       # プルーニング用関数
         self.pruntest = pruntest     # プルーニング用にテスト用データを取り分けるか
@@ -100,13 +90,24 @@ class PrunedTree(DecisionTree):
 
     def get_node(self):
         # 新しくノードを作成する
-        return PrunedTree(
-            prunfnc=self.prunfnc,
-            max_depth=self.max_depth,
-            metric=self.metric,
-            leaf=self.leaf,
-            depth=self.depth+1
-        )
+        return PrunedTree(prunfnc=self.prunfnc, max_depth=self.max_depth, metric=self.metric, leaf=self.leaf, depth=self.depth+1)
+
+    def fit_leaf(self, X, y):
+        # 説明変数から分割した左右のインデックスを取得
+        feat = X[:,self.feat_index]
+        val = self.feat_val
+        l, r = self.make_split(feat, val)
+        # 葉のみを学習させる
+        if len(l) > 0:
+            if isinstance(self.left, PrunedTree):
+                self.left.fit_leaf(X[l], y[l])
+            else:
+                self.left.fit(X[r], y[r])
+        if len(r) > 0:
+            if isinstance(self.right, PrunedTree):
+                self.right.fit_leaf(X[r], y[r])
+            else:
+                self.right.fit(X[r], y[r])
 
     def fit(self, X, y):
         # 深さ=1，根のノードの時のみ
@@ -159,18 +160,6 @@ class PrunedTree(DecisionTree):
                 self.fit_leaf(X, y)
 
         return self
-
-    def fit_leaf(self, X, y):
-        # 説明変数から分割した左右のインデックスを取得
-        feat = X[:,self.feat_index]
-        val = self.feat_val
-        l, r = self.make_split(feat, val)
-        # 葉のみを学習させる
-        if len(l) > 0:
-            if isinstance(self.left, PrunedTree):
-                self.left.fit_leaf(X[l], y[l])
-            else:
-                self.right.fit(X[r], y[r])
 
 
 if __name__ == '__main__':
