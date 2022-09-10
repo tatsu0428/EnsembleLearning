@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import support
 import random
 import entropy
@@ -7,29 +8,27 @@ from linear import Linear
 from pruning import PrunedTree
 from bagging import Bagging
 
-class RandomTree( PrunedTree ):
-	def __init__( self, features=5, max_depth=5, metric=entropy.gini, leaf=ZeroRule, depth=1 ):
-		super().__init__( max_depth=max_depth, metric=metric, leaf=leaf, depth=depth )
+class RandomTree(PrunedTree):
+	def __init__(self, features=5, max_depth=5, metric=entropy.gini, leaf=ZeroRule, depth=1):
+		super().__init__(max_depth=max_depth, metric=metric, leaf=leaf, depth=depth)
 		self.features = features
 
-	def split_tree( self, x, y ):
-		# 説明変数内の次元から、ランダムに使用する次元を選択する
-		index = random.sample( range( x.shape[1] ), min( self.features, x.shape[1] ) )
+	def split_tree(self, X, y):
+		# 説明変数内の次元から,ランダムに使用する次元を選択する
+		index = random.sample(range(X.shape[1]), min(self.features, X.shape[1]))
 		# 説明変数内の選択された次元のみ使用して分割
-		result = self.split_tree_fast( x[ :,index ], y )
-		# 分割の次元を、元の次元に戻す
-		self.feat_index = index[ self.feat_index ]
+		result = self.split_tree_fast(X[:,index], y)
+		# 分割の次元を，元の次元に戻す
+		self.feat_index = index[self.feat_index]
 		return result
 
-	def get_node( self ):
+	def get_node(self):
 		# 新しくノードを作成する
-		return RandomTree( features=self.features, max_depth=self.max_depth,
-				metric=self.metric, leaf=self.leaf, depth=self.depth + 1 )
+		return RandomTree(features=self.features, max_depth=self.max_depth, metric=self.metric, leaf=self.leaf, depth=self.depth + 1)
 
 
 if __name__ == '__main__':
 	random.seed( 1 )
-	import pandas as pd
 	ps = support.get_base_args()
 	ps.add_argument( '--trees', '-t', type=int, default=5, help='Num of Trees' )
 	ps.add_argument( '--ratio', '-p', type=float, default=1.0, help='Bagging size' )
